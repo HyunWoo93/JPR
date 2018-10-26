@@ -7,6 +7,7 @@ from PyQt5.QtMultimedia import QMediaPlaylist, QMediaPlayer, QMediaContent
 from PyQt5.QtGui import QIcon, QColor
 from PyQt5.QtCore import pyqtSlot, QSize, QUrl, Qt
 from shutil import copyfile
+from os import listdir, remove
  
 class App(QMainWindow):
  
@@ -28,7 +29,6 @@ class App(QMainWindow):
         self.couple = []
         self.audiolist = []
         self.configFile = ".//configurationFile.xlsx"
-        self.configFile_temp = ".//configurationFile_temp.xlsx"
         self.initUI()
  
     def initUI(self):
@@ -83,14 +83,28 @@ class App(QMainWindow):
     def openFileNameDialog(self):    
         fileName, _ = QFileDialog.getOpenFileName(self,"Open file", "", "XML files (*.xml, *.xlsx)")
         if fileName:
-            self.wb = openpyxl.load_workbook(fileName.strip())
+            self.wb = load_workbook(fileName.strip())
             self.ws = self.wb.active
             self.fileReady = True
             self.statusbar.showMessage('succeed to load file...')
-            self.row = 2
-            self.tableWidget.clearContents()
+            self.logTable.clearContents()
         else:
             self.statusbar.showMessage('Fail to load file...')
+
+        # set logTable's horizontal header
+        self.logTable.setHorizontalHeaderItem(0, QTableWidgetItem("포장순번"))
+        self.logTable.setHorizontalHeaderItem(1, QTableWidgetItem("거래처명"))
+        self.logTable.setHorizontalHeaderItem(2, QTableWidgetItem("배송센터"))
+        self.logTable.setHorizontalHeaderItem(3, QTableWidgetItem("특이사항"))
+        self.logTable.setHorizontalHeaderItem(4, QTableWidgetItem("박스"))
+
+        col = 6
+        header = str(self.ws.cell(row = 1, column = col + 1).value).strip()
+        while header != 'None':
+            self.logTable.setHorizontalHeaderItem(col - 1, QTableWidgetItem(header))
+            col = col + 1
+            header = str(self.ws.cell(row = 1, column = col + 1).value).strip()
+            
         
 
     def createHorizontalButtons1(self):
@@ -128,10 +142,6 @@ class App(QMainWindow):
         plusColButton = QPushButton('열+', self)
         plusColButton.clicked.connect(self.plus_col)
         layout.addWidget(plusColButton) 
- 
-        saveConfigButton = QPushButton('저장', self)
-        saveConfigButton.clicked.connect(self.save_config)
-        layout.addWidget(saveConfigButton)
 
         init_button = QPushButton('초기화', self)
         init_button.clicked.connect(self.initialize)
@@ -145,18 +155,6 @@ class App(QMainWindow):
         self.logTable.setRowCount(self.tableRow)
         self.logTable.setColumnCount(self.tableCol)
         self.logTable.move(0,0)
-
-        # Horizontal header
-        self.logTable.setHorizontalHeaderItem(0, QTableWidgetItem("포장순번"))
-        self.logTable.setHorizontalHeaderItem(1, QTableWidgetItem("거래처명"))
-        self.logTable.setHorizontalHeaderItem(2, QTableWidgetItem("배송센터"))
-        self.logTable.setHorizontalHeaderItem(3, QTableWidgetItem("박스"))
-        self.logTable.setHorizontalHeaderItem(4, QTableWidgetItem("깔개"))
-        self.logTable.setHorizontalHeaderItem(5, QTableWidgetItem("상부"))
-        self.logTable.setHorizontalHeaderItem(6, QTableWidgetItem("하부"))
-        self.logTable.setHorizontalHeaderItem(7, QTableWidgetItem("행잉"))
-        self.logTable.setHorizontalHeaderItem(8, QTableWidgetItem("평대"))
-        self.logTable.setHorizontalHeaderItem(9, QTableWidgetItem("배너"))
 
     def createConfigTable(self):
         self.configTable = QTableWidget()
@@ -187,13 +185,19 @@ class App(QMainWindow):
                         item = ''
                     self.configTable.setItem(i, j, QTableWidgetItem(item))
 
-            for c in range(self.ccol):
-                self.configTable.item(0, c).setBackground(QColor(255,255,0))
+            # check if files exist
+            arr = listdir('./audio_clips')
+            for row in range(self.crow):
+                for col in range(self.ccol):
+                    fname = str(row) + '_' + str(col) + '.wav'
+                    if not fname in arr:
+                        self.configTable.item(row, col).setBackground(QColor(255,0,0))
 
+        self.configTable.itemDoubleClicked.connect(self.item_doubleClicked)
         self.configTable.itemChanged.connect(self.item_changed)
 
 
-    def setTable(self):
+    def setLogTable(self):
         # shifting other rows
         for r in range(1, self.tableRow):
             for c in range(self.tableCol):
@@ -337,7 +341,7 @@ class App(QMainWindow):
     def speak(self):
         self.playlist.clear()
         for clip in self.audiolist:
-            url = QUrl.fromLocalFile('.\\audio_clips\\' + clip + '.mp3')
+            url = QUrl.fromLocalFile('./audio_clips/' + clip + '.mp3')
             #print(url)
             self.playlist.addMedia(QMediaContent(url))
         self.player.setPlaylist(self.playlist)
@@ -388,70 +392,100 @@ class App(QMainWindow):
         self.load_audiolist()
         self.speak()
 
+#----------------------------------------------#
+
     @pyqtSlot()
     def plus_row(self):
+        # change configTable
         self.crow = self.crow + 1
         self.configTable.setRowCount(self.crow)
-        self.show()
+        
+        # fill the generated cell
+        self.configTable.itemChanged.disconnect(self.item_changed)
+        for col in range(self.ccol):
+            self.configTable.setItem(self.crow - 1, col, QTableWidgetItem(''))
+            self.configTable.item(self.crow - 1, col).setBackground(QColor(255,0,0))
+        self.configTable.itemChanged.connect(self.item_changed)
+
 
 
     @pyqtSlot()
     def plus_col(self):
+        # change configTable
         self.ccol = self.ccol + 1
         self.configTable.setColumnCount(self.ccol)
-        self.show()
 
-
-    @pyqtSlot()
-    def save_config(self):
-        pass
+        # fill the generated cell
+        self.configTable.itemChanged.disconnect(self.item_changed)
+        for row in range(self.crow):
+            self.configTable.setItem(row, self.ccol - 1, QTableWidgetItem(''))
+            self.configTable.item(row, self.ccol - 1).setBackground(QColor(255,0,0))
+        self.configTable.itemChanged.connect(self.item_changed)
 
 
     @pyqtSlot()
     def initialize(self):
-        pass
+        # remove all audio files
+        arr = listdir('./audio_clips')
+        for file in arr:
+            remove('./audio_clips/' + file)
+
+        # init configTable
+        self.configTable.itemChanged.disconnect(self.item_changed)
+        self.configTable.clear()
+        self.crow = 5
+        self.ccol = 5
+        self.configTable.setRowCount(self.crow)
+        self.configTable.setColumnCount(self.ccol)
+        for row in range(self.crow):
+            for col in range(self.ccol):
+                self.configTable.setItem(row, col, QTableWidgetItem(''))
+                self.configTable.item(row, col).setBackground(QColor(255,0,0))
+        self.configTable.itemChanged.connect(self.item_changed)
+
+        # init configFile
+        self.update_configFile()
+
+    def item_doubleClicked(self,item):
+        self.previousItem = item.data(0)
+        print(self.previousItem)
+
+    def update_configFile(self):
+        cwb_w = Workbook(write_only=True)
+        cws_w = cwb_w.create_sheet()
+
+        cws_w.append([self.crow, self.ccol])
+
+        for row in range(self.crow):
+            itemList = []
+            for col in range(self.ccol):
+                itemList.append(self.configTable.item(row, col).data(0))
+            cws_w.append(itemList)
+        cwb_w.save(self.configFile)
 
     def item_changed(self,item):
         self.configTable.itemChanged.disconnect(self.item_changed)
         print(item.row(), item.column(), item.data(0))
-        
-        try:
-            # load configurationFile
-            cwb = load_workbook(self.configFile.strip())
-        except:
-            # message box
-            print("configFile loading Error")
-            pass
-        else:
-            cws = cwb.active
-            previosData = str( cws.cell( row = item.row() + 2, column = item.column() + 1 ).value ).strip()
-            print(previosData)
 
-            fileName, _ = QFileDialog.getOpenFileName(self,"Open file", "", "All Files (*)")
-            if fileName:
-                print('ok')
-                # copy file to local dir
-                dst = "./audio_clips./" + str(item.row()) + '_' + str(item.column()) + '.wav'
-                copyfile(fileName, dst)
+        fileName, _ = QFileDialog.getOpenFileName(self,"Open file", "", "All Files (*)")
+        if fileName:
+            # copy file to local dir
+            dst = "./audio_clips./" + str(item.row()) + '_' + str(item.column()) + '.wav'
+            copyfile(fileName, dst)
 
-                # change cell color
-                self.configTable.item(item.row(), item.column()).setBackground(QColor(0,255,255))
-
-                # update configFile
-                cwb_w = Workbook(write_only=True)
-                cws_w = cwb_w.create_sheet()
-
-                cws_w.append([self.crow, self.ccol])
-
-                for row in range(self.crow):
-                    itemList = []
-                    for col in range(self.ccol):
-                        itemList.append(self.configTable.item(row, col).data(0))
-                    cws_w.append(itemList)
-                cwb_w.save(self.configFile_temp)
-
+            # change cell color
+            if item.row() == 0:
+                self.configTable.item(item.row(), item.column()).setBackground(QColor(255,255,0))
             else:
-                self.configTable.setItem(item.row(), item.column(), QTableWidgetItem(previosData))
+                self.configTable.item(item.row(), item.column()).setBackground(QColor(255,255,255))
+
+            # update configFile
+            self.update_configFile()
+
+        else:
+            self.configTable.setItem(item.row(), item.column(), QTableWidgetItem(self.previousItem))
+            self.configTable.item(item.row(), item.column()).setBackground(QColor(255,0,0))
+
         self.configTable.itemChanged.connect(self.item_changed)
 
 

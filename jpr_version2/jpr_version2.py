@@ -22,13 +22,12 @@ class App(QMainWindow):
         self.width = 1050
         self.height = 550
         self.fileReady = False
-        self.tableRow = 6
-        self.tableCol = 10
+        self.tableRow = 5
+        self.tableCol = 15
         self.row = 2
-        self.words = []
-        self.couple = []
         self.audiolist = []
         self.configFile = ".//configurationFile.xlsx"
+        self.dict = {'num': None, 'partner': None, 'parcel': None, 'exception': None, 'box': None}
         self.initUI()
  
     def initUI(self):
@@ -86,8 +85,9 @@ class App(QMainWindow):
             self.wb = load_workbook(fileName.strip())
             self.ws = self.wb.active
             self.fileReady = True
+            self.row = 2
             self.statusbar.showMessage('succeed to load file...')
-            self.logTable.clearContents()
+            self.logTable.clear()
         else:
             self.statusbar.showMessage('Fail to load file...')
 
@@ -98,12 +98,23 @@ class App(QMainWindow):
         self.logTable.setHorizontalHeaderItem(3, QTableWidgetItem("특이사항"))
         self.logTable.setHorizontalHeaderItem(4, QTableWidgetItem("박스"))
 
+        self.dict = {'num': None, 'partner': None, 'parcel': None, 'exception': None, 'box': None}
         col = 6
+        i = 0
         header = str(self.ws.cell(row = 1, column = col + 1).value).strip()
         while header != 'None':
-            self.logTable.setHorizontalHeaderItem(col - 1, QTableWidgetItem(header))
+            print(header)
+            self.dict[header] = None
             col = col + 1
+            i = i + 1
             header = str(self.ws.cell(row = 1, column = col + 1).value).strip()
+
+        self.tableCol = 5 + i
+        print(self.tableCol)
+        self.logTable.setColumnCount(self.tableCol)
+
+        for col in range(5, self.tableCol):
+            self.logTable.setHorizontalHeaderItem(col, QTableWidgetItem(list(self.dict.keys())[col]))
             
         
 
@@ -189,9 +200,14 @@ class App(QMainWindow):
             arr = listdir('./audio_clips')
             for row in range(self.crow):
                 for col in range(self.ccol):
+                    self.configTable.item(row, col).setBackground(QColor(255,0,0))
                     fname = str(row) + '_' + str(col) + '.wav'
-                    if not fname in arr:
-                        self.configTable.item(row, col).setBackground(QColor(255,0,0))
+                    if fname in arr:
+                        if row == 0:
+                            self.configTable.item(row, col).setBackground(QColor(255,255,0))
+                        else:
+                            self.configTable.item(row, col).setBackground(QColor(255,255,255))
+                        
 
         self.configTable.itemDoubleClicked.connect(self.item_doubleClicked)
         self.configTable.itemChanged.connect(self.item_changed)
@@ -202,101 +218,59 @@ class App(QMainWindow):
         for r in range(1, self.tableRow):
             for c in range(self.tableCol):
                 try:
-                    self.tableWidget.item(r,c).setBackground(QColor(255,255,255))
-                    self.tableWidget.setItem(r-1 , c, self.tableWidget.item(r,c).clone())
+                    self.logTable.item(r,c).setBackground(QColor(255,255,255))
+                    self.logTable.setItem(r-1 , c, self.logTable.item(r,c).clone())
                 except:
                     pass
 
         # set current row
-        self.tableWidget.setItem(self.tableRow - 1, 0, QTableWidgetItem(self.num))
-        self.tableWidget.setItem(self.tableRow - 1, 1, QTableWidgetItem(self.partner))
-        self.tableWidget.setItem(self.tableRow - 1, 2, QTableWidgetItem(self.parcel))
-        self.tableWidget.setItem(self.tableRow - 1, 3, QTableWidgetItem(self.box))
-        self.tableWidget.setItem(self.tableRow - 1, 4, QTableWidgetItem(self.kkar))
-        self.tableWidget.setItem(self.tableRow - 1, 5, QTableWidgetItem(self.sang))
-        self.tableWidget.setItem(self.tableRow - 1, 6, QTableWidgetItem(self.ha))
-        self.tableWidget.setItem(self.tableRow - 1, 7, QTableWidgetItem(self.hang))
-        self.tableWidget.setItem(self.tableRow - 1, 8, QTableWidgetItem(self.pyeng))
-        self.tableWidget.setItem(self.tableRow - 1, 9, QTableWidgetItem(self.ban))
-
-        for c in range(self.tableCol):
-            self.tableWidget.item(self.tableRow - 1, c).setBackground(QColor(255,255,0))
+        for idx, key in enumerate(list(self.dict.keys())):
+            if type(self.dict[key]) is list:
+                self.logTable.setItem(self.tableRow - 1, idx, QTableWidgetItem(' '.join(self.dict[key])))
+                self.logTable.item(self.tableRow - 1, idx).setBackground(QColor(255,255,0))
+            else:
+                self.logTable.setItem(self.tableRow - 1, idx, QTableWidgetItem(self.dict[key]))
+                self.logTable.item(self.tableRow - 1, idx).setBackground(QColor(255,255,0))
 
     def read(self):
         if not self.fileReady:
             self.openFileNameDialog()
 
-        #포장 순번
-        self.num = str(self.ws.cell(row = self.row, column = 3).value[2:]).strip()
-        print('<<<', self.num, '>>>', end = ' / ')
-        self.couple.append('포장순번')
-        self.parsing(self.num)
+        # 포장 순번
+        self.dict['num'] = str(self.ws.cell(row = self.row, column = 3).value[2:]).strip()
+        print('<<<', self.dict['num'], '>>>', end = ' / ')
 
-        #거래처명
-        self.partner = str(self.ws.cell(row = self.row, column = 5).value).strip()
-        print('거래처:', self.partner, end = ' / ')
+        # 거래처명
+        self.dict['partner'] = str(self.ws.cell(row = self.row, column = 5).value).strip()
+        print('거래처:', self.dict['partner'], end = ' / ')
 
-        #택배발송
-        self.parcel = str(self.ws.cell(row = self.row, column = 4).value).strip()
-        print('배송센터:', self.parcel, end = ' / ')
-        self.couple.append('배송센터')
-        self.parsing(self.parcel)
+        # 배송센터
+        self.dict['parcel'] = str(self.ws.cell(row = self.row, column = 4).value).strip()
+        print('배송센터:', self.dict['parcel'], end = ' / ')
 
-        #박스
-        self.box = str(self.ws.cell(row = self.row, column = 2).value).strip()
-        print('박스:', self.box, end =' / ')
-        self.couple.append('박스')
-        self.parsing(self.box)
+        # 특이사항
+        self.dict['exception'] = str(self.ws.cell(row = self.row, column = 6).value).strip()
+        print('특이사항:', self.dict['exception'], end = ' / ')
 
+        # 박스
+        self.dict['box'] = str(self.ws.cell(row = self.row, column = 2).value).strip()
+        print('박스:', self.dict['box'], end = ' / ')
 
-        #깔개
-        self.kkar = str(self.ws.cell(row = self.row, column = 7).value).strip()
-        print('깔개:', self.kkar, end =' / ')
-        self.couple.append('깔개')
-        self.parsing(self.kkar)
+        # left things
+        print(len(self.dict))
+        for i in range(5, len(self.dict)):
+            header = str(self.ws.cell(row = 1, column = i + 2).value).strip()
+            self.dict[header] = str(self.ws.cell(row = self.row, column = i + 2).value).strip()
+            print(header + ':', self.dict[header], end = ' / ')
+            self.parsing(header, self.dict[header])
 
-
-        #상부
-        self.sang = str(self.ws.cell(row = self.row, column = 8).value).strip()
-        print('상부:', self.sang, end =' / ')
-        self.couple.append('상부')
-        self.parsing(self.sang)
+        print(self.dict)
+        self.setLogTable()
 
 
-        #하부
-        self.ha = str(self.ws.cell(row = self.row, column = 9).value).strip()
-        print('하부:', self.ha, end =' / ')
-        self.couple.append('하부')
-        self.parsing(self.ha)
-
-
-        #행잉
-        self.hang = str(self.ws.cell(row = self.row, column = 10).value).strip()
-        print('행잉:', self.hang, end =' / ')
-        self.couple.append('행잉')
-        self.parsing(self.hang)
-
-
-        #평대
-        self.pyeng = str(self.ws.cell(row = self.row, column = 11).value).strip()
-        print('평대:', self.pyeng, end =' / ')
-        self.couple.append('평대')
-        self.parsing(self.pyeng)
-
-
-        #배너
-        self.ban = str(self.ws.cell(row = self.row, column = 12).value).strip()
-        print('배너:', self.ban)
-        self.couple.append('배너')
-        self.parsing(self.ban)
-
-
-        self.setTable()
-        print(self.words)
-
-    def parsing(self, val):
+    def parsing(self, key, val):
         if val == 'None' or val == '':
-            self.couple.append('없음')
+            self.dict[key] = None
 
         else:
             if '(' in val or '/' in val:
@@ -304,39 +278,71 @@ class App(QMainWindow):
                 for i in range(len(arr)):
                     if ')' in arr[i]:
                         arr[i] = arr[i][:arr[i].index(')')]
-                self.couple.append(arr)
+                self.dict[key] = arr
 
             else:
-                self.couple.append(val)
+                self.dict[key] = val
 
-        self.words.append(self.couple)
-        self.couple = [] 
+    def itemFromKeyVal(self, key, val):
+        items = self.configTable.findItems(val, Qt.MatchExactly)
+        if len(items) <= 0:
+            # Error
+            print('You should check configTable!')
+        else:
+            for item in items:
+                if self.configTable.item(0, item.column()).data(0) == key:
+                    return item
+
 
     def load_audiolist(self):
-        for item, value in self.words:
-            if item == '배송센터':
-                if value == '택배발송':
-                    self.audiolist.append('택배발송')
-            else:
-                self.audiolist.append(item.strip())
-                # 포장순번
-                if item == '포장순번':
-                    for i in range(3):
-                        self.audiolist.append('_' + value[i])
+        for key, val in self.dict.items():
 
-                # in / or () case
-                elif isinstance(value, list):
-                    for name in value:
-                        # '2개' case
-                        if '2' in name:
-                            self.audiolist.append('2')
-                        else:
-                            self.audiolist.append(name.strip())
+            # 포장순번     
+            if key == 'num':
+                for i in range(len(self.dict['num'])):
+                    self.audiolist.append('_' + val[i])
+                self.audiolist.append('번')
+
+            # 택배발송
+            elif key == 'parcel':
+                if val == '택배발송':
+                    item = self.itemFromKeyVal('기타', val)
+                    self.audiolist.append(str(item.row()) + '_' + str(item.column()))
+            
+            # 박스
+            elif key == 'box':
+                item = self.itemFromKeyVal('박스', val)
+                self.audiolist.append(str(item.row()) + '_' + str(item.column()))
+
+            elif key in ['partner', 'exception']:
+                pass
+            
+            # general case
+            else:
+                # The case(val == None) will be ignored 
+                if val == None:
+                    pass
+                
+                # when val is list
+                elif type(val) == list:
+                    for eachVal in val:
+                        item = self.itemFromKeyVal(key, eachVal)
+                        self.audiolist.append('0_' + str(item.column())) # key
+                        self.audiolist.append(str(item.row()) + '_' + str(item.column())) # val
+
+                # when val is not list
                 else:
-                    self.audiolist.append(value.strip())
+                    item = self.itemFromKeyVal(key, val)
+                    if self.configTable.item(item.row(), item.column()).data(0) == 1 and \
+                    self.configTable.item(item.row(), item.column()).data(0) == self.configTable.item(0, item.column()).data(0):
+                        self.audiolist.append('0_' + str(item.column())) # key
+                    else:
+                        self.audiolist.append('0_' + str(item.column())) # key
+                        self.audiolist.append(str(item.row()) + '_' + str(item.column())) # val
 
             # beep
             self.audiolist.append('beep')
+        print(self.audiolist)
 
     def speak(self):
         self.playlist.clear()
@@ -359,20 +365,20 @@ class App(QMainWindow):
             else:
                 self.row -= 1
 
-        del self.words[:]
+        self.dict = self.dict.fromkeys(self.dict, None)
         del self.audiolist[:]
         self.read()
-        self.load_audiolist()
-        self.speak()
+        #self.load_audiolist()
+        #self.speak()
 
 
     @pyqtSlot()
     def cur_click(self):
-        del self.words[:]
+        self.dict = self.dict.fromkeys(self.dict, None)
         del self.audiolist[:]
         self.read()
         self.load_audiolist()
-        self.speak()
+        #self.speak()
 
 
     @pyqtSlot()
@@ -386,11 +392,11 @@ class App(QMainWindow):
             else:
                 self.row += 1
 
-        del self.words[:]
+        self.dict = self.dict.fromkeys(self.dict, None)
         del self.audiolist[:]
         self.read()
         self.load_audiolist()
-        self.speak()
+        #self.speak()
 
 #----------------------------------------------#
 
@@ -467,8 +473,25 @@ class App(QMainWindow):
         self.configTable.itemChanged.disconnect(self.item_changed)
         print(item.row(), item.column(), item.data(0))
 
+        # get file name
         fileName, _ = QFileDialog.getOpenFileName(self,"Open file", "", "All Files (*)")
-        if fileName:
+
+        # count the number of key that has same name
+        keys = self.configTable.findItems(item.data(0), Qt.MatchExactly)
+        kcnt = 0
+        for key in keys:
+            if key.row() == 0:
+                kcnt = kcnt + 1
+
+        # count the number of atribute that has same name
+        atributes = self.configTable.findItems(item.data(0), Qt.MatchExactly)
+        acnt = 0
+        for atribute in atributes:
+            if atribute.column() == item.column():
+                acnt = acnt + 1
+
+        # change is accepted only in case of uniqueness and existence
+        if fileName and kcnt < 2 and acnt < 2:
             # copy file to local dir
             dst = "./audio_clips./" + str(item.row()) + '_' + str(item.column()) + '.wav'
             copyfile(fileName, dst)
@@ -483,6 +506,7 @@ class App(QMainWindow):
             self.update_configFile()
 
         else:
+            print("It can't be changed.")
             self.configTable.setItem(item.row(), item.column(), QTableWidgetItem(self.previousItem))
             self.configTable.item(item.row(), item.column()).setBackground(QColor(255,0,0))
 

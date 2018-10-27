@@ -66,7 +66,21 @@ class App(QMainWindow):
         self.explanation = QLabel()
         self.explanation.setText(
             """<<< JPR reader 설정 테이블 >>>    
-            이곳에서 JPR reader가 읽어주는 항목과 아이템을 설정할 수 있습니다.""")
+            이곳에서 JPR reader가 읽어주는 항목과 아이템을 설정할 수 있습니다.
+            항목과 아이템의 설정 방법은 셀을 더블 클릭한 후 이름을 입력하는 방식으로진행됩니다.
+            그 후 떠오른 파일 탐색기에서 지정할 mp3파일을 선택해 주세요.
+            설정의 확인은 셀의 색으로 확인 가능합니다. 지정이 완료된 항목은 노란색, 아이템은 하늘색으로 표시됩니다.
+            지정이 되지 않은 셀은 빨간색으로 표시됩니다. 행과 열 버튼으로 테이블의 크기를 조절할 수 있으며
+            초기화시 모든 설정은 사라지며 테이블은 5by5로 초기화 됩니다.
+
+            <<<주의사항>>>
+            1. 첫번째 열은 반드시 항목을 입력해 주세요.
+            2. 입력되는 이름은 엑셀파일에서 표현된 명칭과 완벽히 일치해야 합니다.(엔터나 스페이스, 오타 주의!)
+            3. 초기화를 누르면 처음부터 모든 항목과 아이템을 지정해야 합니다.
+            4. 엑셀 파일의 ()나 /을 통해 구분한 아이템은 따로 입력해 주세요.
+            5. 사용하는 엑셀파일의 구조를 유지해 주세요. 변경시 프로그램의 수정이 필요할 수 있습니다.(예: '박스'항목은 항상 있을 것으로 간주됩니다.)
+
+            제작자 정보: 김현우(gguussddnn@gmail.com)""")
         self.explanation.setAlignment(Qt.AlignCenter)
         self.createConfigTable()
         self.createHorizontalButtons2()
@@ -81,59 +95,61 @@ class App(QMainWindow):
         self.show()
 
     def openFileNameDialog(self):    
-        fileName, _ = QFileDialog.getOpenFileName(self,"Open file", "", "XML files (*.xml, *.xlsx)")
-        if fileName:
+        fileName, _ = QFileDialog.getOpenFileName(self,"Open file", "", "All Files (*)")
+        if not fileName:
+            self.statusbar.showMessage('Fail to load file...')
+
+        else:
             self.wb = load_workbook(fileName.strip())
             self.ws = self.wb.active
             self.fileReady = True
             self.row = 2
             self.statusbar.showMessage('succeed to load file...')
             self.logTable.clear()
-        else:
-            self.statusbar.showMessage('Fail to load file...')
+            
+            # set logTable's horizontal header
+            self.logTable.setHorizontalHeaderItem(0, QTableWidgetItem("포장순번"))
+            self.logTable.setHorizontalHeaderItem(1, QTableWidgetItem("거래처명"))
+            self.logTable.setHorizontalHeaderItem(2, QTableWidgetItem("배송센터"))
+            self.logTable.setHorizontalHeaderItem(3, QTableWidgetItem("특이사항"))
+            self.logTable.setHorizontalHeaderItem(4, QTableWidgetItem("박스"))
 
-        # set logTable's horizontal header
-        self.logTable.setHorizontalHeaderItem(0, QTableWidgetItem("포장순번"))
-        self.logTable.setHorizontalHeaderItem(1, QTableWidgetItem("거래처명"))
-        self.logTable.setHorizontalHeaderItem(2, QTableWidgetItem("배송센터"))
-        self.logTable.setHorizontalHeaderItem(3, QTableWidgetItem("특이사항"))
-        self.logTable.setHorizontalHeaderItem(4, QTableWidgetItem("박스"))
-
-        self.dict = {'num': None, 'partner': None, 'parcel': None, 'exception': None, 'box': None}
-        col = 6
-        i = 0
-        header = str(self.ws.cell(row = 1, column = col + 1).value).strip()
-        while header != 'None':
-            print(header)
-            self.dict[header] = None
-            col = col + 1
-            i = i + 1
+            # initialize dictionary
+            self.dict = {'num': None, 'partner': None, 'parcel': None, 'exception': None, 'box': None}
+            col = 6
+            num = 0
             header = str(self.ws.cell(row = 1, column = col + 1).value).strip()
+            while header != 'None':
+                self.dict[header] = None
+                col = col + 1
+                num = num + 1
+                header = str(self.ws.cell(row = 1, column = col + 1).value).strip()
 
-        self.tableCol = 5 + i
-        print(self.tableCol)
-        self.logTable.setColumnCount(self.tableCol)
+            self.tableCol = 5 + num
+            self.logTable.setColumnCount(self.tableCol)
 
-        for col in range(5, self.tableCol):
-            self.logTable.setHorizontalHeaderItem(col, QTableWidgetItem(list(self.dict.keys())[col]))
+            for c in range(5, self.tableCol):
+                self.logTable.setHorizontalHeaderItem(c, QTableWidgetItem(list(self.dict.keys())[c]))
             
     def createButtonGroupBox(self):
         buttonGroupBox = QGroupBox("Controller")
         vLayout = QVBoxLayout()
 
-        pre_button = QPushButton('', self)
+        pre_button = QPushButton('w', self)
         pre_button.clicked.connect(self.pre_click)
         pre_button.setIcon(QIcon('.\\img\\up-arrow.png'))
         pre_button.setIconSize(QSize(600,100))
+        pre_button.setShortcut('w')
         vLayout.addWidget(pre_button) 
 
         hBottensWidget = self.createHButtons()
         vLayout.addWidget(hBottensWidget)
 
-        next_button = QPushButton('', self)
+        next_button = QPushButton('x', self)
         next_button.clicked.connect(self.next_click)
         next_button.setIcon(QIcon('.\\img\\down-arrow.png'))
         next_button.setIconSize(QSize(600,100))
+        next_button.setShortcut('x')
         vLayout.addWidget(next_button) 
 
         buttonGroupBox.setLayout(vLayout)
@@ -144,22 +160,25 @@ class App(QMainWindow):
         hBottensWidget = QWidget()
         hLayout = QHBoxLayout()
 
-        back_button = QPushButton('', self)
+        back_button = QPushButton('a', self)
         back_button.clicked.connect(self.back_click)
         back_button.setIcon(QIcon('.\\img\\left-arrow.png'))
         back_button.setIconSize(QSize(200,150))
+        back_button.setShortcut('a')
         hLayout.addWidget(back_button) 
  
-        cur_button = QPushButton('', self)
+        cur_button = QPushButton('s', self)
         cur_button.clicked.connect(self.cur_click)
         cur_button.setIcon(QIcon('.\\img\\reload.png'))
         cur_button.setIconSize(QSize(200,150))
+        cur_button.setShortcut('s')
         hLayout.addWidget(cur_button) 
  
-        forward_button = QPushButton('', self)
+        forward_button = QPushButton('d', self)
         forward_button.clicked.connect(self.forward_click)
         forward_button.setIcon(QIcon('.\\img\\right-arrow.png'))
         forward_button.setIconSize(QSize(200,150))
+        forward_button.setShortcut('d')
         hLayout.addWidget(forward_button) 
  
         hBottensWidget.setLayout(hLayout)
@@ -199,7 +218,7 @@ class App(QMainWindow):
             cwb = load_workbook(self.configFile.strip())
         except:
             # message box
-            string = "Can't load configFile."
+            string = "설정파일을 불러올 수 없습니다."
             QMessageBox.question(self, 'Error', string, QMessageBox.Ok, QMessageBox.Ok)
 
         else:
@@ -269,8 +288,6 @@ class App(QMainWindow):
                 self.logTable.item(self.tableRow - 1, idx).setBackground(QColor(255,255,0))
 
     def read(self):
-        if not self.fileReady:
-            self.openFileNameDialog()
 
         # 포장 순번
         self.dict['num'] = str(self.ws.cell(row = self.row, column = 3).value[2:]).strip()
@@ -333,7 +350,6 @@ class App(QMainWindow):
             if key == 'num':
                 for i in range(len(self.dict['num'])):
                     self.audiolist.append('_' + val[i])
-                self.audiolist.append('_번')
 
                 # beep
                 self.audiolist.append('_beep')
@@ -407,7 +423,7 @@ class App(QMainWindow):
     @pyqtSlot()
     def pre_click(self):
         if not self.fileReady:
-            pass
+            self.cur_click()
         
         else:
             if self.row == 2:
@@ -415,26 +431,32 @@ class App(QMainWindow):
             else:
                 self.row -= 1
 
-        self.dict = self.dict.fromkeys(self.dict, None)
-        del self.audiolist[:]
-        self.read()
-        self.load_audiolist()
-        self.speak()
+            self.dict = self.dict.fromkeys(self.dict, None)
+            del self.audiolist[:]
+            self.read()
+            self.load_audiolist()
+            self.speak()
 
 
     @pyqtSlot()
     def cur_click(self):
-        self.dict = self.dict.fromkeys(self.dict, None)
-        del self.audiolist[:]
-        self.read()
-        self.load_audiolist()
-        self.speak()
+        if not self.fileReady:
+            string = '파일이 준비되어 있지 않습니다.'
+            QMessageBox.question(self, '경고', string, QMessageBox.Ok, QMessageBox.Ok)
+            self.openFileNameDialog()
+        else:
+
+            self.dict = self.dict.fromkeys(self.dict, None)
+            del self.audiolist[:]
+            self.read()
+            self.load_audiolist()
+            self.speak()
 
 
     @pyqtSlot()
     def next_click(self):
         if not self.fileReady:
-            pass
+            self.cur_click()
 
         else:
             if self.row == self.ws.max_row:
@@ -442,11 +464,11 @@ class App(QMainWindow):
             else:
                 self.row += 1
 
-        self.dict = self.dict.fromkeys(self.dict, None)
-        del self.audiolist[:]
-        self.read()
-        self.load_audiolist()
-        self.speak()
+            self.dict = self.dict.fromkeys(self.dict, None)
+            del self.audiolist[:]
+            self.read()
+            self.load_audiolist()
+            self.speak()
 
     @pyqtSlot()
     def back_click(self):
@@ -576,15 +598,15 @@ class App(QMainWindow):
         try:
             cwb_w.save(self.configFile)
         except:
-                string = """Maybe the configFile is opened.
-                            Try again after close the file."""
+                string = """설정파일이 열려있을 수 있습니다.
+                            설정파일을 닫은 후에 다시 시도하세요."""
                 QMessageBox.question(self, 'Error', string, QMessageBox.Ok, QMessageBox.Ok)
 
     def item_changed(self,item):
         self.configTable.itemChanged.disconnect(self.item_changed) # lock
         
         if item.row() == 0 and item.column() == 0:
-            string = "이 항복은 바꿀 수 없습니다."
+            string = "이 항목은 바꿀 수 없습니다."
             QMessageBox.question(self, 'Error', string, QMessageBox.Ok, QMessageBox.Ok)
             self.configTable.setItem(item.row(), item.column(), QTableWidgetItem(self.previousItem))
 

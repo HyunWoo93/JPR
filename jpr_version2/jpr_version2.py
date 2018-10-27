@@ -20,8 +20,8 @@ class App(QMainWindow):
         self.title = 'JPR Reader GUI version2'
         self.left = 50
         self.top = 100
-        self.width = 1050
-        self.height = 550
+        self.width = 1200
+        self.height = 800
         self.fileReady = False
         self.tableRow = 5
         self.tableCol = 15
@@ -55,10 +55,10 @@ class App(QMainWindow):
         self.setCentralWidget(self.tabs)
 
         # tab1 gui
-        self.createHorizontalButtons1()
+        self.ButtonGroupBox = self.createButtonGroupBox()
         self.createLogTable()
         self.tab1.layout = QVBoxLayout()
-        self.tab1.layout.addWidget(self.horizontalButtons1) 
+        self.tab1.layout.addWidget(self.ButtonGroupBox) 
         self.tab1.layout.addWidget(self.logTable) 
         self.tab1.setLayout(self.tab1.layout)
 
@@ -117,31 +117,54 @@ class App(QMainWindow):
         for col in range(5, self.tableCol):
             self.logTable.setHorizontalHeaderItem(col, QTableWidgetItem(list(self.dict.keys())[col]))
             
-        
+    def createButtonGroupBox(self):
+        buttonGroupBox = QGroupBox("Controller")
+        vLayout = QVBoxLayout()
 
-    def createHorizontalButtons1(self):
-        self.horizontalButtons1 = QGroupBox("Controller")
-        layout = QHBoxLayout()
- 
         pre_button = QPushButton('', self)
         pre_button.clicked.connect(self.pre_click)
-        pre_button.setIcon(QIcon('.\\img\\pre.png'))
-        pre_button.setIconSize(QSize(250,250))
-        layout.addWidget(pre_button) 
+        pre_button.setIcon(QIcon('.\\img\\up-arrow.png'))
+        pre_button.setIconSize(QSize(600,100))
+        vLayout.addWidget(pre_button) 
+
+        hBottensWidget = self.createHButtons()
+        vLayout.addWidget(hBottensWidget)
+
+        next_button = QPushButton('', self)
+        next_button.clicked.connect(self.next_click)
+        next_button.setIcon(QIcon('.\\img\\down-arrow.png'))
+        next_button.setIconSize(QSize(600,100))
+        vLayout.addWidget(next_button) 
+
+        buttonGroupBox.setLayout(vLayout)
+
+        return buttonGroupBox
+
+    def createHButtons(self):
+        hBottensWidget = QWidget()
+        hLayout = QHBoxLayout()
+
+        back_button = QPushButton('', self)
+        back_button.clicked.connect(self.back_click)
+        back_button.setIcon(QIcon('.\\img\\left-arrow.png'))
+        back_button.setIconSize(QSize(200,150))
+        hLayout.addWidget(back_button) 
  
         cur_button = QPushButton('', self)
         cur_button.clicked.connect(self.cur_click)
-        cur_button.setIcon(QIcon('.\\img\\cur.png'))
-        cur_button.setIconSize(QSize(250,250))
-        layout.addWidget(cur_button) 
+        cur_button.setIcon(QIcon('.\\img\\reload.png'))
+        cur_button.setIconSize(QSize(200,150))
+        hLayout.addWidget(cur_button) 
  
-        next_button = QPushButton('', self)
-        next_button.clicked.connect(self.next_click)
-        next_button.setIcon(QIcon('.\\img\\next.png'))
-        next_button.setIconSize(QSize(250,250))
-        layout.addWidget(next_button) 
+        forward_button = QPushButton('', self)
+        forward_button.clicked.connect(self.forward_click)
+        forward_button.setIcon(QIcon('.\\img\\right-arrow.png'))
+        forward_button.setIconSize(QSize(200,150))
+        hLayout.addWidget(forward_button) 
  
-        self.horizontalButtons1.setLayout(layout)
+        hBottensWidget.setLayout(hLayout)
+
+        return hBottensWidget
 
     def createHorizontalButtons2(self):
         self.horizontalButtons2 = QGroupBox("설정 변경")
@@ -251,30 +274,24 @@ class App(QMainWindow):
 
         # 포장 순번
         self.dict['num'] = str(self.ws.cell(row = self.row, column = 3).value[2:]).strip()
-        print('<<<', self.dict['num'], '>>>', end = ' / ')
 
         # 거래처명
         self.dict['partner'] = str(self.ws.cell(row = self.row, column = 5).value).strip()
-        print('거래처:', self.dict['partner'], end = ' / ')
 
         # 배송센터
         self.dict['parcel'] = str(self.ws.cell(row = self.row, column = 4).value).strip()
-        print('배송센터:', self.dict['parcel'], end = ' / ')
 
         # 특이사항
         self.dict['exception'] = str(self.ws.cell(row = self.row, column = 6).value).strip()
-        print('특이사항:', self.dict['exception'], end = ' / ')
 
         # 박스
         self.dict['box'] = str(self.ws.cell(row = self.row, column = 2).value).strip()
-        print('박스:', self.dict['box'], end = ' / ')
 
         # left things
         print(len(self.dict))
         for i in range(5, len(self.dict)):
             header = str(self.ws.cell(row = 1, column = i + 2).value).strip()
             self.dict[header] = str(self.ws.cell(row = self.row, column = i + 2).value).strip()
-            print(header + ':', self.dict[header], end = ' / ')
             self.parsing(header, self.dict[header])
 
         print(self.dict)
@@ -385,6 +402,7 @@ class App(QMainWindow):
         self.player.setPlaylist(self.playlist)
         self.player.play()
             
+#----------------------- Control button callback -----------------------#
 
     @pyqtSlot()
     def pre_click(self):
@@ -430,7 +448,52 @@ class App(QMainWindow):
         self.load_audiolist()
         self.speak()
 
-#----------------------------------------------#
+    @pyqtSlot()
+    def back_click(self):
+        if self.playlist.mediaCount() == 0:
+            self.cur_click()
+        elif self.playlist.mediaCount() != 0:
+            p = re.compile('.+_beep.+')
+            cnt = 0
+            for i in range(self.playlist.mediaCount()):
+                # if it's start point, start at here
+                if self.playlist.currentIndex() == 0:
+                    break
+                # go backward
+                self.playlist.setCurrentIndex(self.playlist.previousIndex(1))
+                
+                # start at previous beep point
+                if p.match(str(self.playlist.currentMedia().canonicalUrl())):
+                    cnt = cnt + 1
+                    if cnt == 2:
+                        print(self.playlist.currentIndex())
+                        if self.player.state() == QMediaPlayer.StoppedState:
+                            self.player.play()
+                        break
+                
+
+
+    @pyqtSlot()
+    def forward_click(self):
+        if self.playlist.mediaCount() == 0:
+            self.cur_click()
+        elif self.playlist.mediaCount() != 0:
+             p = re.compile('.+_beep.+')
+             for i in range(self.playlist.mediaCount()):
+                # don't go further from end point
+                if self.playlist.currentIndex() < 0:
+                    break
+
+                # go forward
+                self.playlist.setCurrentIndex(self.playlist.nextIndex(1))
+                
+                # start at next beep point
+                if p.match(str(self.playlist.currentMedia().canonicalUrl())):
+                    print(self.playlist.currentIndex())
+                    break
+
+
+#----------------------- Configuration button callback -----------------------#
 
     @pyqtSlot()
     def plus_row(self):
@@ -492,6 +555,8 @@ class App(QMainWindow):
 
         # init configFile
         self.update_configFile()
+
+#---------------------- ConfigTable signal callback ------------------------#
 
     def item_doubleClicked(self,item):
         self.previousItem = item.data(0)

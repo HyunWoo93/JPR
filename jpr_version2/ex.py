@@ -1,3 +1,10 @@
-dict = {1:'a', 2:'b', 3:'c'}
-for key,val in dict.items():
-	print(key,val)
+import re
+
+
+p = re.compile('_.+')
+a= ['_1', '_2', '1_1', '2_2']
+for file in a:
+	if p.match(file):
+		print(file)
+	else:
+		print(file + 'nono')

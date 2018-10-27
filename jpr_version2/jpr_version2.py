@@ -2,7 +2,8 @@ import sys
 import re
 from openpyxl import Workbook, load_workbook
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QAction, QTableWidget, QTableWidgetItem, QVBoxLayout, \
-QPushButton, QHBoxLayout, QGroupBox, QDialog, QFileDialog, QAction, QTabWidget, QLabel, QTableView, QAbstractItemView
+QPushButton, QHBoxLayout, QGroupBox, QDialog, QFileDialog, QAction, QTabWidget, QLabel, QTableView, QAbstractItemView, \
+QMessageBox
 from PyQt5.QtMultimedia import QMediaPlaylist, QMediaPlayer, QMediaContent
 from PyQt5.QtGui import QIcon, QColor
 from PyQt5.QtCore import pyqtSlot, QSize, QUrl, Qt
@@ -175,8 +176,9 @@ class App(QMainWindow):
             cwb = load_workbook(self.configFile.strip())
         except:
             # message box
-            print("Error")
-            pass
+            string = "Can't load configFile."
+            QMessageBox.question(self, 'Error', string, QMessageBox.Ok, QMessageBox.Ok)
+
         else:
             # Get matadata
             cws = cwb.active
@@ -188,7 +190,7 @@ class App(QMainWindow):
             self.configTable.setColumnCount(self.ccol)
             self.configTable.move(0,0)
 
-            # Load data
+            # Load data from configFile
             for i in range(self.crow):
                 for j in range(self.ccol):
                     item = str(cws.cell(row = i+2, column = j+1).value).strip()
@@ -200,17 +202,28 @@ class App(QMainWindow):
             arr = listdir('./audio_clips')
             for row in range(self.crow):
                 for col in range(self.ccol):
+                    # if 박스(0,0)
+                    if row == 0 and col == 0:
+                        continue;
+
+                    # reset backgound color
                     self.configTable.item(row, col).setBackground(QColor(255,0,0))
-                    fname = str(row) + '_' + str(col) + '.wav'
+                    
+                    # if file exist, change background color
+                    fname = str(row) + '_' + str(col) + '.mp3'
                     if fname in arr:
                         if row == 0:
                             self.configTable.item(row, col).setBackground(QColor(255,255,0))
                         else:
-                            self.configTable.item(row, col).setBackground(QColor(255,255,255))
-                        
+                            self.configTable.item(row, col).setBackground(QColor(0,255,255))
 
-        self.configTable.itemDoubleClicked.connect(self.item_doubleClicked)
-        self.configTable.itemChanged.connect(self.item_changed)
+            # 박스(0,0)
+            self.configTable.setItem(0, 0, QTableWidgetItem('박스'))
+            self.configTable.item(0, 0).setBackground(QColor(255,255,255))
+            
+            # link the callback function            
+            self.configTable.itemDoubleClicked.connect(self.item_doubleClicked)
+            self.configTable.itemChanged.connect(self.item_changed)
 
 
     def setLogTable(self):
@@ -278,6 +291,7 @@ class App(QMainWindow):
                 for i in range(len(arr)):
                     if ')' in arr[i]:
                         arr[i] = arr[i][:arr[i].index(')')]
+                    arr[i] = arr[i].strip()
                 self.dict[key] = arr
 
             else:
@@ -287,7 +301,8 @@ class App(QMainWindow):
         items = self.configTable.findItems(val, Qt.MatchExactly)
         if len(items) <= 0:
             # Error
-            print('You should check configTable!')
+            string = '('+key+', '+val+') '+'아이템을 찾을 수 없습니다.'
+            QMessageBox.question(self, 'Error', string, QMessageBox.Ok, QMessageBox.Ok)
         else:
             for item in items:
                 if self.configTable.item(0, item.column()).data(0) == key:
@@ -301,18 +316,27 @@ class App(QMainWindow):
             if key == 'num':
                 for i in range(len(self.dict['num'])):
                     self.audiolist.append('_' + val[i])
-                self.audiolist.append('번')
+                self.audiolist.append('_번')
+
+                # beep
+                self.audiolist.append('_beep')
 
             # 택배발송
             elif key == 'parcel':
                 if val == '택배발송':
-                    item = self.itemFromKeyVal('기타', val)
-                    self.audiolist.append(str(item.row()) + '_' + str(item.column()))
+                    self.audiolist.append('_택배발송')
+
+                    # beep
+                    self.audiolist.append('_beep')
             
             # 박스
             elif key == 'box':
                 item = self.itemFromKeyVal('박스', val)
-                self.audiolist.append(str(item.row()) + '_' + str(item.column()))
+                if item:
+                    self.audiolist.append(str(item.row()) + '_' + str(item.column()))
+
+                    # beep
+                    self.audiolist.append('_beep')
 
             elif key in ['partner', 'exception']:
                 pass
@@ -325,23 +349,31 @@ class App(QMainWindow):
                 
                 # when val is list
                 elif type(val) == list:
-                    for eachVal in val:
+                    for idx, eachVal in enumerate(val):
                         item = self.itemFromKeyVal(key, eachVal)
-                        self.audiolist.append('0_' + str(item.column())) # key
-                        self.audiolist.append(str(item.row()) + '_' + str(item.column())) # val
+                        if item:
+                            if idx == 0:
+                                self.audiolist.append('0_' + str(item.column())) # key
+                            self.audiolist.append(str(item.row()) + '_' + str(item.column())) # val
+
+                    # beep
+                    self.audiolist.append('_beep')
 
                 # when val is not list
                 else:
                     item = self.itemFromKeyVal(key, val)
-                    if self.configTable.item(item.row(), item.column()).data(0) == 1 and \
-                    self.configTable.item(item.row(), item.column()).data(0) == self.configTable.item(0, item.column()).data(0):
-                        self.audiolist.append('0_' + str(item.column())) # key
-                    else:
-                        self.audiolist.append('0_' + str(item.column())) # key
-                        self.audiolist.append(str(item.row()) + '_' + str(item.column())) # val
+                    if item:
+                        if val == '1' or key == val:
+                            self.audiolist.append('0_' + str(item.column())) # key
+                        else:
+                            self.audiolist.append('0_' + str(item.column())) # key
+                            self.audiolist.append(str(item.row()) + '_' + str(item.column())) # val
 
-            # beep
-            self.audiolist.append('beep')
+                        # beep
+                        self.audiolist.append('_beep')
+
+            
+
         print(self.audiolist)
 
     def speak(self):
@@ -368,8 +400,8 @@ class App(QMainWindow):
         self.dict = self.dict.fromkeys(self.dict, None)
         del self.audiolist[:]
         self.read()
-        #self.load_audiolist()
-        #self.speak()
+        self.load_audiolist()
+        self.speak()
 
 
     @pyqtSlot()
@@ -378,7 +410,7 @@ class App(QMainWindow):
         del self.audiolist[:]
         self.read()
         self.load_audiolist()
-        #self.speak()
+        self.speak()
 
 
     @pyqtSlot()
@@ -396,7 +428,7 @@ class App(QMainWindow):
         del self.audiolist[:]
         self.read()
         self.load_audiolist()
-        #self.speak()
+        self.speak()
 
 #----------------------------------------------#
 
@@ -431,23 +463,32 @@ class App(QMainWindow):
 
     @pyqtSlot()
     def initialize(self):
-        # remove all audio files
+        # remove configurable audio files
         arr = listdir('./audio_clips')
+        p = re.compile('_.+')
         for file in arr:
+            if p.match(file):
+                continue
             remove('./audio_clips/' + file)
 
         # init configTable
-        self.configTable.itemChanged.disconnect(self.item_changed)
+        self.configTable.itemChanged.disconnect(self.item_changed) # lock
+
         self.configTable.clear()
         self.crow = 5
         self.ccol = 5
         self.configTable.setRowCount(self.crow)
         self.configTable.setColumnCount(self.ccol)
+
+        # reset configTable item
         for row in range(self.crow):
             for col in range(self.ccol):
                 self.configTable.setItem(row, col, QTableWidgetItem(''))
                 self.configTable.item(row, col).setBackground(QColor(255,0,0))
-        self.configTable.itemChanged.connect(self.item_changed)
+        self.configTable.setItem(0, 0, QTableWidgetItem('박스'))
+        self.configTable.item(0, 0).setBackground(QColor(255,255,255))
+
+        self.configTable.itemChanged.connect(self.item_changed) # unlock
 
         # init configFile
         self.update_configFile()
@@ -467,50 +508,73 @@ class App(QMainWindow):
             for col in range(self.ccol):
                 itemList.append(self.configTable.item(row, col).data(0))
             cws_w.append(itemList)
-        cwb_w.save(self.configFile)
+        try:
+            cwb_w.save(self.configFile)
+        except:
+                string = """Maybe the configFile is opened.
+                            Try again after close the file."""
+                QMessageBox.question(self, 'Error', string, QMessageBox.Ok, QMessageBox.Ok)
 
     def item_changed(self,item):
-        self.configTable.itemChanged.disconnect(self.item_changed)
-        print(item.row(), item.column(), item.data(0))
-
-        # get file name
-        fileName, _ = QFileDialog.getOpenFileName(self,"Open file", "", "All Files (*)")
-
-        # count the number of key that has same name
-        keys = self.configTable.findItems(item.data(0), Qt.MatchExactly)
-        kcnt = 0
-        for key in keys:
-            if key.row() == 0:
-                kcnt = kcnt + 1
-
-        # count the number of atribute that has same name
-        atributes = self.configTable.findItems(item.data(0), Qt.MatchExactly)
-        acnt = 0
-        for atribute in atributes:
-            if atribute.column() == item.column():
-                acnt = acnt + 1
-
-        # change is accepted only in case of uniqueness and existence
-        if fileName and kcnt < 2 and acnt < 2:
-            # copy file to local dir
-            dst = "./audio_clips./" + str(item.row()) + '_' + str(item.column()) + '.wav'
-            copyfile(fileName, dst)
-
-            # change cell color
-            if item.row() == 0:
-                self.configTable.item(item.row(), item.column()).setBackground(QColor(255,255,0))
-            else:
-                self.configTable.item(item.row(), item.column()).setBackground(QColor(255,255,255))
-
-            # update configFile
-            self.update_configFile()
+        self.configTable.itemChanged.disconnect(self.item_changed) # lock
+        
+        if item.row() == 0 and item.column() == 0:
+            string = "이 항복은 바꿀 수 없습니다."
+            QMessageBox.question(self, 'Error', string, QMessageBox.Ok, QMessageBox.Ok)
+            self.configTable.setItem(item.row(), item.column(), QTableWidgetItem(self.previousItem))
 
         else:
-            print("It can't be changed.")
-            self.configTable.setItem(item.row(), item.column(), QTableWidgetItem(self.previousItem))
-            self.configTable.item(item.row(), item.column()).setBackground(QColor(255,0,0))
+            # get file name 
+            fileName, _ = QFileDialog.getOpenFileName(self,"Open file", "", "All Files (*)")
 
-        self.configTable.itemChanged.connect(self.item_changed)
+            # count the number of key that has same name
+            keys = self.configTable.findItems(item.data(0), Qt.MatchExactly)
+            kcnt = 0
+            for key in keys:
+                if key.row() == 0:
+                    kcnt = kcnt + 1
+
+            # count the number of atribute that has same name
+            atributes = self.configTable.findItems(item.data(0), Qt.MatchExactly)
+            acnt = 0
+            for atribute in atributes:
+                if atribute.row() == 0:
+                    pass
+                elif atribute.column() == item.column():
+                    acnt = acnt + 1
+
+            # change is accepted only in case of uniqueness and existence and it is not 박스(0,0)
+            if kcnt >= 2:
+                string = "항목명이 같을 수 없습니다."
+                QMessageBox.question(self, 'Error', string, QMessageBox.Ok, QMessageBox.Ok)
+                self.configTable.setItem(item.row(), item.column(), QTableWidgetItem(self.previousItem))
+
+            elif acnt >= 2:
+                string = "같은 항목에 같은 이름의 아이템을 둘 수 없습니다."
+                QMessageBox.question(self, 'Error', string, QMessageBox.Ok, QMessageBox.Ok)
+                self.configTable.setItem(item.row(), item.column(), QTableWidgetItem(self.previousItem))
+
+            elif fileName:
+                # copy file to local dir
+                dst = "./audio_clips./" + str(item.row()) + '_' + str(item.column()) + '.mp3'
+                copyfile(fileName, dst)
+
+                # change cell color
+                if item.row() == 0:
+                    self.configTable.item(item.row(), item.column()).setBackground(QColor(255,255,0))
+                else:
+                    self.configTable.item(item.row(), item.column()).setBackground(QColor(0,255,255))
+
+                # update configFile
+                self.update_configFile()
+                
+            else:
+                string = "선택이 취소됨."
+                QMessageBox.question(self, 'Error', string, QMessageBox.Ok, QMessageBox.Ok)
+                self.configTable.setItem(item.row(), item.column(), QTableWidgetItem(self.previousItem))
+
+
+        self.configTable.itemChanged.connect(self.item_changed) # unlock
 
 
 

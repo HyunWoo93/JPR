@@ -1,0 +1,1 @@
+pyinstaller -F -w jpr_version2.py
